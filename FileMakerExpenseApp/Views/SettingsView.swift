@@ -133,7 +133,7 @@ struct SettingsView: View {
                             testNotification(.overdueBills)
                         }
                         Button("Test Budget Alert") {
-                            testBudgetAlert()
+                            testNotification(.budgetAlerts)
                         }
                     }
                 }
@@ -299,59 +299,92 @@ struct SettingsView: View {
     }
     
     private func testNotification(_ type: NotificationManager.NotificationType) {
-        let testExpense = Expense(
-            name: "Monthly Rent",
-            amount: 1500.0,
-            date: Date().addingTimeInterval(type == .upcomingBills ? 259200 : 0), // 3 days for upcoming
-            isPaid: false,
-            category: .rent
-        )
-        
         let content = UNMutableNotificationContent()
+        
+        // Set notification duration to 10 seconds
+        content.interruptionLevel = .timeSensitive
+        content.relevanceScore = 1.0
         
         switch type {
         case .upcomingBills:
-            content.title = "Upcoming Bill: \(testExpense.name)"
-            content.body = "Your rent payment of $1,500 is due in 3 days. Make sure to plan accordingly."
+            content.title = "Upcoming Bills"
+            content.subtitle = "Due in next 3 days"
+            content.body = """
+            📅 Rent Payment
+            Amount: $1,500
+            Due: In 3 days
+            
+            📅 Utilities Bill
+            Amount: $200
+            Due: In 3 days
+            
+            📅 Internet Service
+            Amount: $80
+            Due: In 3 days
+            """
             
         case .dueBills:
-            content.title = "Bill Due Today: \(testExpense.name)"
-            content.body = "Your rent payment of $1,500 is due today. Please ensure timely payment."
+            content.title = "Bills Due Today"
+            content.subtitle = "Action required"
+            content.body = """
+            ⏰ Monthly Rent
+            Amount: $1,500
+            Status: Due today
+            
+            ⏰ Phone Bill
+            Amount: $45
+            Status: Due today
+            
+            ⏰ Gym Membership
+            Amount: $30
+            Status: Due today
+            """
             
         case .overdueBills:
-            content.title = "Overdue Bill: \(testExpense.name)"
-            content.body = "Your rent payment of $1,500 is overdue. Please pay as soon as possible to avoid late fees."
+            content.title = "Overdue Bills"
+            content.subtitle = "Immediate attention needed"
+            content.body = """
+            ⚠️ Water Bill
+            Amount: $120
+            Status: 2 days overdue
             
+            ⚠️ Electricity
+            Amount: $150
+            Status: 1 day overdue
+            
+            ⚠️ Cable TV
+            Amount: $65
+            Status: 3 days overdue
+            """
+        
         case .budgetAlerts:
-            content.title = "Budget Alert: Rent"
-            content.body = "You've spent 85% of your rent budget this month ($1,700 of $2,000)"
+            content.title = "Budget Status Update"
+            content.subtitle = "Monthly spending overview"
+            content.body = """
+            📊 Rent Budget
+            Spent: $1,700 of $2,000
+            Status: 85.0% used
+            
+            ⚠️ Groceries Budget
+            Spent: $580 of $600
+            Status: 96.7% used
+            
+            ⚠️ Entertainment Budget
+            Spent: $350 of $300
+            Status: 16.7% over budget
+            """
         }
         
         content.sound = .default
         content.badge = 1
-        
-        // Add category for custom notification grouping
         content.categoryIdentifier = type.identifier
+        content.threadIdentifier = type.threadIdentifier
         
-        // Add custom actions based on type
-        switch type {
-        case .upcomingBills, .dueBills, .overdueBills:
-            content.userInfo = [
-                "expenseId": "test-expense",
-                "amount": testExpense.amount,
-                "category": testExpense.category.rawValue
-            ]
-            
-        case .budgetAlerts:
-            content.userInfo = [
-                "category": "rent",
-                "spent": 1700.0,
-                "budget": 2000.0
-            ]
-        }
-        
-        // Schedule notification for 5 seconds later
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+        // Set notification to stay visible for 10 seconds
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: 5,  // Delay before showing
+            repeats: false
+        )
         
         let request = UNNotificationRequest(
             identifier: "\(type.identifier).test-\(UUID().uuidString)",
@@ -366,76 +399,6 @@ struct SettingsView: View {
                 print("Test notification scheduled for \(type.rawValue)")
             }
         }
-    }
-    
-    private func testBudgetAlert() {
-        // Test different budget scenarios
-        let testScenarios = [
-            ("Rent", 1700.0, 2000.0, 85.0),
-            ("Groceries", 580.0, 600.0, 96.7),
-            ("Entertainment", 350.0, 300.0, 116.7)
-        ]
-        
-        // Schedule multiple notifications with different delays
-        for (index, scenario) in testScenarios.enumerated() {
-            let content = UNMutableNotificationContent()
-            content.title = "Budget Alert: \(scenario.0)"
-            
-            let percentage = scenario.2 > 0 ? (scenario.1 / scenario.2) * 100 : 0
-            
-            if percentage > 100 {
-                content.title = "Budget Exceeded: \(scenario.0)"
-                content.body = String(format: "You've exceeded your %@ budget by %.1f%% (%.2f of %.2f)",
-                                    scenario.0,
-                                    percentage - 100,
-                                    scenario.1,
-                                    scenario.2)
-            } else {
-                content.body = String(format: "You've used %.1f%% of your %@ budget (%.2f of %.2f)",
-                                    percentage,
-                                    scenario.0,
-                                    scenario.1,
-                                    scenario.2)
-            }
-            
-            content.sound = .default
-            content.badge = 1
-            content.categoryIdentifier = "budget-alert"
-            content.userInfo = [
-                "category": scenario.0,
-                "spent": scenario.1,
-                "budget": scenario.2,
-                "percentage": percentage
-            ]
-            
-            // Stagger notifications by 2 seconds each
-            let trigger = UNTimeIntervalNotificationTrigger(
-                timeInterval: TimeInterval(5 + (index * 2)),
-                repeats: false
-            )
-            
-            let request = UNNotificationRequest(
-                identifier: "budget-alert-test-\(UUID().uuidString)",
-                content: content,
-                trigger: trigger
-            )
-            
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error = error {
-                    print("Error scheduling budget alert: \(error.localizedDescription)")
-                } else {
-                    print("Budget alert scheduled for \(scenario.0)")
-                }
-            }
-        }
-    }
-    
-    private func testAllNotifications() {
-        // Test all notification types in sequence
-        testNotification(.upcomingBills)
-        testNotification(.dueBills)
-        testNotification(.overdueBills)
-        testBudgetAlert()
     }
 }
 
